@@ -19,6 +19,10 @@ helpers.extend CoffeeScript, new EventEmitter
 printLine = (line) -> process.stdout.write line + '\n'
 printWarn = (line) -> process.binding('stdio').writeError line + '\n'
 
+growlNotify = (err) ->
+  exec "growlnotify -m '#{err.message}' 'CoffeeScript build failed'", (err) ->
+    printWarn "Couldn't run growlnotify: #{err.message.replace(/\n/, '')}" if err
+
 # The help banner that is printed when `coffee` is called without arguments.
 BANNER = '''
   Usage: coffee [options] path/to/script.coffee
@@ -31,6 +35,7 @@ SWITCHES = [
   ['-o', '--output [DIR]',    'set the directory for compiled JavaScript']
   ['-j', '--join',            'concatenate the scripts before compiling']
   ['-w', '--watch',           'watch scripts for changes, and recompile']
+  [      '--growlnotify',     'post failure messages to growl']
   ['-p', '--print',           'print the compiled JavaScript to stdout']
   ['-l', '--lint',            'pipe the compiled JavaScript through JSLint']
   ['-s', '--stdio',           'listen for and compile scripts over stdio']
@@ -89,7 +94,9 @@ compileScripts = ->
                 compileJoin() if helpers.compact(contents).length > 0
               else
                 compileScript(source, code.toString(), base)
-            watch source, base if opts.watch and not opts.join
+            if opts.watch and not opts.join
+              watch source, base
+              CoffeeScript.on 'failure', growlNotify if opts.growlnotify
     compile source, true
 
 # Compile a single source script, containing the given code, according to the
